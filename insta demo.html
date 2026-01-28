@@ -1,0 +1,333 @@
+﻿<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>NavaPulse</title>
+
+<!-- PWA MANIFEST -->
+<link rel="manifest" href="manifest.json">
+
+<style>
+body{
+  margin:0;
+  font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto;
+  background:#fafafa;
+}
+.hidden{display:none}
+
+/* HEADER */
+header{
+  background:#fff;
+  padding:10px 14px;
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+  border-bottom:1px solid #ddd;
+  font-weight:bold;
+}
+#installBtn{
+  background:#0095f6;
+  color:#fff;
+  border:none;
+  border-radius:5px;
+  padding:5px 10px;
+  margin-right:8px;
+}
+
+/* STORIES */
+.stories{
+  display:flex;
+  gap:12px;
+  padding:10px;
+  background:#fff;
+  overflow-x:auto;
+  border-bottom:1px solid #ddd;
+}
+.story img{
+  width:60px;height:60px;
+  border-radius:50%;
+  border:3px solid #ff004f;
+}
+
+/* POSTS */
+.feed{padding-bottom:80px}
+.post{
+  background:#fff;
+  margin-bottom:10px;
+  border-bottom:1px solid #ddd;
+}
+.post img,.post video{width:100%}
+.actions{padding:8px}
+
+/* FOOTER */
+.footer{
+  position:fixed;
+  bottom:0;
+  width:100%;
+  background:#fff;
+  border-top:1px solid #ddd;
+  display:flex;
+  justify-content:space-around;
+  padding:10px 0;
+  font-size:20px;
+}
+
+/* INPUT */
+input,select,button{
+  width:100%;
+  padding:10px;
+  margin-top:10px;
+}
+button{
+  background:#0095f6;
+  color:white;
+  border:none;
+  border-radius:5px;
+}
+
+/* PROFILE */
+.profile-img{
+  width:120px;height:120px;
+  border-radius:50%;
+  object-fit:cover;
+  border:3px solid #0095f6;
+}
+</style>
+</head>
+
+<body>
+
+<!-- LOGIN -->
+<div id="loginPage">
+<h2 style="text-align:center">NavaPulse</h2>
+<input id="emailInput" placeholder="Email">
+<input id="passwordInput" type="password" placeholder="Password">
+<select id="countryInput">
+<option value="">Select Country</option>
+<option>India</option>
+<option>Other</option>
+</select>
+<button onclick="sendOTP()">Send OTP</button>
+<button onclick="guestLogin()">Continue as Guest</button>
+</div>
+
+<!-- OTP -->
+<div id="otpPage" class="hidden">
+<h3>OTP Verification</h3>
+<input id="otpInput" placeholder="Enter OTP">
+<button onclick="verifyOTP()">Verify OTP</button>
+<button id="resendBtn" class="hidden" onclick="sendOTP()">Resend OTP</button>
+</div>
+
+<!-- HOME -->
+<div id="homePage" class="hidden">
+<header>
+  <span>NavaPulse</span>
+  <div>
+    <button id="installBtn" class="hidden">⬇ Install</button>
+    <span>✉️</span>
+  </div>
+</header>
+
+<div class="stories" id="storyBar"></div>
+<div class="feed" id="postList"></div>
+
+<div class="footer">
+<span onclick="showHome()">🏠</span>
+<span onclick="showSearch()">🔍</span>
+<span onclick="showUpload()">➕</span>
+<span onclick="showReels()">🎬</span>
+<span onclick="showProfile()">👤</span>
+</div>
+</div>
+
+<!-- SEARCH -->
+<div id="searchPage" class="hidden">
+<h3>Search</h3>
+<input id="searchInput" placeholder="Search users, posts, reels" oninput="searchAll()">
+<div id="searchResults"></div>
+<button onclick="showHome()">Back</button>
+</div>
+
+<!-- UPLOAD -->
+<div id="uploadPage" class="hidden">
+<h3>Create</h3>
+<input type="file" id="postFile">
+<button onclick="uploadPost()">Upload Post</button>
+<input type="file" id="reelFile" accept="video/*">
+<button onclick="uploadReel()">Upload Reel</button>
+<button onclick="showHome()">Back</button>
+</div>
+
+<!-- REELS -->
+<div id="reelsPage" class="hidden">
+<h3>Reels</h3>
+<div id="reelFeed"></div>
+<button onclick="showHome()">Back</button>
+</div>
+
+<!-- PROFILE -->
+<div id="profilePage" class="hidden">
+<h3>Profile</h3>
+<img id="profileImg" class="profile-img"><br>
+<input type="file" id="profileFile">
+<button onclick="updateProfile()">Update Photo</button>
+<p id="profileEmail"></p>
+<p id="profileCountry"></p>
+<button onclick="logout()">Logout</button>
+</div>
+
+<script>
+/* DATA */
+let users=JSON.parse(localStorage.users||"{}");
+let posts=JSON.parse(localStorage.posts||"[]");
+let stories=JSON.parse(localStorage.stories||"[]");
+
+let user="",isGuest=false;
+let otp="",tries=0;
+
+/* OTP */
+function sendOTP(){
+ otp=Math.floor(100000+Math.random()*900000);
+ alert("OTP: "+otp);
+ tries=0;
+ loginPage.classList.add("hidden");
+ otpPage.classList.remove("hidden");
+}
+function verifyOTP(){
+ if(otpInput.value!=otp){
+   tries++;
+   if(tries>=3)resendBtn.classList.remove("hidden");
+   alert("Wrong OTP");return;
+ }
+ let e=emailInput.value,p=passwordInput.value,c=countryInput.value;
+ if(!users[e]) users[e]={password:p,country:c,profile:""};
+ user=e;
+ localStorage.loggedUser=e;
+ save();start();
+}
+
+/* GUEST */
+function guestLogin(){
+ user="Guest";isGuest=true;
+ localStorage.loggedUser="Guest";
+ start();
+}
+
+/* START */
+function start(){
+ hideAll();
+ homePage.classList.remove("hidden");
+ loadPosts();
+ loadStories();
+}
+
+/* AUTO LOGIN */
+window.onload=()=>{
+ let s=localStorage.loggedUser;
+ if(s){user=s;if(s==="Guest")isGuest=true;start();}
+};
+
+/* STORIES */
+function loadStories(){
+ storyBar.innerHTML="";
+ stories.forEach(s=>{
+   storyBar.innerHTML+=`<div class="story"><img src="${s.img}"></div>`;
+ });
+}
+
+/* POSTS */
+function uploadPost(){
+ let r=new FileReader();
+ r.onload=()=>{posts.unshift({type:"post",src:r.result});save();showHome();}
+ r.readAsDataURL(postFile.files[0]);
+}
+function uploadReel(){
+ let r=new FileReader();
+ r.onload=()=>{posts.unshift({type:"reel",src:r.result});save();showHome();}
+ r.readAsDataURL(reelFile.files[0]);
+}
+function loadPosts(){
+ postList.innerHTML="";
+ posts.filter(p=>p.type==="post").forEach(p=>{
+ postList.innerHTML+=`<div class="post"><img src="${p.src}"><div class="actions">❤️</div></div>`;
+ });
+}
+function loadReels(){
+ reelFeed.innerHTML="";
+ posts.filter(p=>p.type==="reel").forEach(p=>{
+ reelFeed.innerHTML+=`<div class="post"><video src="${p.src}" controls></video></div>`;
+ });
+}
+
+/* SEARCH */
+function searchAll(){
+ let q=searchInput.value.toLowerCase();
+ searchResults.innerHTML="";
+ Object.keys(users).filter(u=>u.toLowerCase().includes(q))
+ .forEach(u=>searchResults.innerHTML+=`<p>👤 ${u}</p>`);
+}
+
+/* PROFILE */
+function showProfile(){
+ hideAll();
+ profilePage.classList.remove("hidden");
+ profileImg.src=users[user]?.profile||"";
+ profileEmail.textContent="Email: "+user;
+ profileCountry.textContent="Country: "+users[user]?.country;
+}
+function updateProfile(){
+ let r=new FileReader();
+ r.onload=()=>{users[user].profile=r.result;save();showProfile();}
+ r.readAsDataURL(profileFile.files[0]);
+}
+
+/* NAV */
+function hideAll(){
+ loginPage.classList.add("hidden");
+ otpPage.classList.add("hidden");
+ homePage.classList.add("hidden");
+ searchPage.classList.add("hidden");
+ uploadPage.classList.add("hidden");
+ reelsPage.classList.add("hidden");
+ profilePage.classList.add("hidden");
+}
+function showHome(){hideAll();homePage.classList.remove("hidden");loadPosts()}
+function showSearch(){hideAll();searchPage.classList.remove("hidden")}
+function showUpload(){if(!isGuest){hideAll();uploadPage.classList.remove("hidden")}}
+function showReels(){hideAll();reelsPage.classList.remove("hidden");loadReels()}
+function logout(){localStorage.clear();location.reload()}
+
+/* SAVE */
+function save(){
+ localStorage.users=JSON.stringify(users);
+ localStorage.posts=JSON.stringify(posts);
+ localStorage.stories=JSON.stringify(stories);
+}
+
+/* 🔽 INSTALL APP LOGIC */
+let deferredPrompt;
+const installBtn=document.getElementById("installBtn");
+
+window.addEventListener("beforeinstallprompt",e=>{
+ e.preventDefault();
+ deferredPrompt=e;
+ installBtn.classList.remove("hidden");
+});
+installBtn.onclick=async()=>{
+ if(!deferredPrompt)return;
+ deferredPrompt.prompt();
+ await deferredPrompt.userChoice;
+ deferredPrompt=null;
+ installBtn.classList.add("hidden");
+};
+
+/* SERVICE WORKER */
+if("serviceWorker" in navigator){
+ navigator.serviceWorker.register("sw.js");
+}
+</script>
+
+</body>
+</html>
+
